@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {extractFinalJson} from '../cli-json.js';
+import {parseAntigravityOutput,analyzeWithAntigravity} from '../antigravity.js';
+import {demoPlan} from '../src/model.js';
+const wrap=response=>JSON.stringify({status:'SUCCESS',conversation_id:'test-conversation',response});
+test('CLI extracts complete JSON after unfenced commentary including braces in strings',()=>{const plan=demoPlan();plan.name='A {quoted} \\" room';const text='Now let me provide the final result.\n'+JSON.stringify(plan)+'\nDone.';assert.equal(parseAntigravityOutput(wrap(text)).plan.name,plan.name);});
+test('unfinished final draft never falls back to older valid JSON',()=>{assert.equal(extractFinalJson('{"old":true}\nNow correcting: {"new":'),'{"new":');assert.throws(()=>parseAntigravityOutput(wrap(JSON.stringify(demoPlan())+'\n{"width":')));});
+test('prose-only response has explicit format error rather than geometry failure',()=>{assert.throws(()=>parseAntigravityOutput(wrap('Now let me analyze this image.')),e=>e.code==='INVALID_RESPONSE'&&e.message.includes('說明文字'));});
+test('prose-only CLI response resumes same conversation to request final JSON',async()=>{let calls=0;const p=await analyzeWithAntigravity({image:'data:image/png;base64,aA==',width:12,config:{model:'test'},run:async(_,args)=>{calls++;if(calls===2){assert.ok(args.includes('--conversation'));assert.ok(args.includes('test-conversation'));assert.match(args[1],/Finish the task NOW/);}return {stdout:wrap(calls===1?'Now let me produce the JSON.':JSON.stringify(demoPlan()))};}});assert.equal(p.furniture.length,10);assert.equal(calls,2);});
+test('repeated prose-only replies stop after bounded retries without a fabricated plan',async()=>{let calls=0;await assert.rejects(analyzeWithAntigravity({image:'data:image/png;base64,aA==',width:12,config:{model:'test'},run:async()=>{calls++;return {stdout:wrap('Now let me think.')};}}),e=>e.code==='INVALID_RESPONSE'&&e.message.includes('原專案未變更'));assert.equal(calls,3);});

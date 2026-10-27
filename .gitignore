@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+test-results/
+.roomform-antigravity/
+
+data/
+
+.roomform-codex/
+output/
+*.blend1
+*.log

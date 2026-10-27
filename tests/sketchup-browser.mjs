@@ -1,0 +1,14 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const browser=await chromium.launch({channel:'chromium',headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{const page=await browser.newPage({viewport:{width:1600,height:1200}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5173/?project=pp4');await page.waitForFunction(()=>document.querySelector('#counts').textContent.includes('43 件家具'));
+let pending=page.waitForEvent('download');await page.locator('#export-dae').click();let dl=await pending;await dl.saveAs('output/pp4-sketchup.dae');
+pending=page.waitForEvent('download');await page.locator('#export-sketchup').click();dl=await pending;await dl.saveAs('output/pp4.mesh.json');const original=JSON.parse(await readFile('output/pp4.mesh.json','utf8'));
+await page.locator('#sketchup-import').setInputFiles('output/pp4-sketchup.dae');await page.waitForFunction(()=>document.querySelector('#source-tag').textContent.includes('三角網格'));await page.locator('#top').click();await page.waitForTimeout(500);await page.locator('#viewport').screenshot({path:'output/sketchup-roundtrip.png'});
+pending=page.waitForEvent('download');await page.locator('#export-sketchup').click();dl=await pending;const again=JSON.parse(await readFile(await dl.path(),'utf8'));
+const bounds=data=>{const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];let triangles=0;for(const g of data.groups)for(const m of g.meshes){triangles+=m.positions.length/9;m.positions.forEach((v,i)=>{min[i%3]=Math.min(min[i%3],v);max[i%3]=Math.max(max[i%3],v);});}return {size:max.map((x,i)=>x-min[i]),triangles};};const a=bounds(original),b=bounds(again);assert.equal(a.triangles,b.triangles);assert.equal(original.groups[0].meshes[0].color,again.groups[0].meshes[0].color);for(let i=0;i<3;i++)assert.ok(Math.abs(a.size[i]-b.size[i])<.001,`${a.size} vs ${b.size}`);
+await page.locator('#sketchup-import').setInputFiles('output/pp4.mesh.json');await page.waitForFunction(()=>document.querySelector('#file-name').textContent==='pp4.mesh.json');await page.locator('#object-list').selectOption('furniture:0');await page.locator('[name="x"]').fill('7');await page.locator('#object-form button[type="submit"]').click();assert.equal(await page.locator('[name="x"]').inputValue(),'7.000');
+await page.locator('#sketchup-import').setInputFiles({name:'example.skp',mimeType:'application/octet-stream',buffer:Buffer.from('not skp')});await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('轉檔失敗'));
+assert.deepEqual(errors,[]);console.log('DAE roundtrip preserves dimensions and triangles; mesh JSON import/edit and SKP guidance passed.');
+}finally{await browser.close();}

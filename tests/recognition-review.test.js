@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {inferScale,auditPlan} from '../recognition-review.js';
+import {analyzeWithAntigravity} from '../antigravity.js';
+import {normalizePlan} from '../analyze.js';
+import {demoPlan} from '../src/model.js';
+const anchors=[{label:'bed',x1:.1,y1:.1,x2:.3,y2:.1,assumedMeters:2.4},{label:'door',x1:.5,y1:.2,x2:.6,y2:.2,assumedMeters:1.2}];
+const out=p=>({stdout:JSON.stringify({status:'SUCCESS',response:JSON.stringify(p)})});
+test('scale uses multiple anchors and refuses insufficient evidence',()=>{assert.ok(Math.abs(inferScale({anchors},.75).width-12)<1e-8);assert.throws(()=>inferScale({anchors:anchors.slice(0,1)},.75),/兩個/);});
+test('automatic scale and mandatory review repair invalid furniture',async()=>{let calls=0;const bad=demoPlan();bad.furniture[0].width=-1;const prompts=[];const p=await analyzeWithAntigravity({image:'data:image/png;base64,aA==',width:12,depth:9,autoScale:true,imageWidth:800,imageHeight:600,config:{model:'test'},run:async(_,args)=>{prompts.push(args[1]);calls++;return out(calls===1?{anchors}:calls===2?bad:demoPlan());}});assert.equal(calls,3);assert.equal(p.analysis.rounds.length,2);assert.ok(p.scale.estimated);assert.match(prompts[2],/第 1 件家具/);});
+test('review never silently falls back to an earlier valid draft',async()=>{let calls=0;const bad=demoPlan();bad.furniture[0].type='mystery';await assert.rejects(analyzeWithAntigravity({image:'data:image/png;base64,aA==',width:12,depth:9,config:{model:'test'},run:async()=>out(++calls===1?demoPlan():bad)}),/類型不支援/);assert.equal(calls,3);});
+test('thin fixtures and common aliases normalize without dropping objects',()=>{const p=demoPlan();p.furniture.push({type:'television',x:1,z:1,width:1.2,depth:.08,height:'1.1',rotation:'90'});const next=normalizePlan(p).plan;assert.equal(next.furniture.at(-1).type,'tv');assert.equal(next.furniture.at(-1).height,1.1);assert.equal(next.furniture.length,11);p.furniture.at(-1).x=99;assert.throws(()=>normalizePlan(p),/第 11 件家具.*中心超出/);});
+test('audit flags duplicates without deleting geometry',()=>{const p=demoPlan();p.furniture.push({...p.furniture[0]});assert.ok(auditPlan(p).some(x=>x.includes('疑似重複')));assert.equal(p.furniture.length,11);});

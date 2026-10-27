@@ -1,0 +1,55 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {loadGlbGeometry} from './glb-geometry.mjs';
+import {Box3} from 'three';
+import {sandboxProjects} from './project-sandbox.mjs';
+const browser=await chromium.launch({channel:'chromium',headless:true,args:['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1600,height:1200}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+try{
+ await sandboxProjects(page);
+ await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#object-list');
+ const image=await page.evaluate(()=>{
+  const c=document.createElement('canvas');c.width=c.height=400;const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,400,400);ctx.fillStyle='black';
+  for(const [x,w] of [[30,70],[140,90],[290,80]])ctx.fillRect(x,80,w,8);
+  ctx.fillRect(100,84,2,40);ctx.beginPath();ctx.arc(100,84,40,0,Math.PI/2);ctx.stroke();
+  ctx.fillRect(230,81,60,1);ctx.fillRect(230,86,60,1);
+  return c.toDataURL().split(',')[1];
+ });
+ await page.locator('#upload').setInputFiles({name:'door-window-plan.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')});
+ await page.waitForFunction(()=>document.querySelector('#file-name').textContent==='door-window-plan.png');
+ await page.locator('#width').fill('10');await page.locator('#engine').selectOption('local');await page.locator('#analyze').click();
+ await page.waitForFunction(()=>document.querySelector('#source-tag').textContent.includes('門窗自動定位'));
+ assert.match(await page.locator('#counts').textContent(),/1 道牆面.*2 組門窗/);
+ await page.locator('#object-list').selectOption('opening:1');
+ assert.equal(await page.locator('#material-field').isVisible(),false);
+ assert.equal(await page.locator('#auto-scale-field').isVisible(),false);
+ await page.locator('[name="height"]').fill('1.1');await page.locator('[name="sillHeight"]').fill('1.05');
+ await page.locator('#object-form button[type="submit"]').click();assert.equal(await page.locator('#property-error').isVisible(),false);
+ const saved=page.waitForEvent('download');await page.locator('#save').click();const json=await saved;
+ const plan=JSON.parse(await readFile(await json.path(),'utf8'));
+ assert.equal(plan.openings[0].type,'door');assert.ok(Math.abs(plan.openings[0].width-1)<.08);
+ assert.equal(plan.openings[1].type,'window');assert.ok(Math.abs(plan.openings[1].width-1.5)<.08);
+ assert.equal(plan.openings[1].height,1.1);assert.equal(plan.openings[1].sillHeight,1.05);
+ const exported=page.waitForEvent('download');await page.locator('#export').click();const file=await exported;
+ const bytes=await readFile(await file.path());const gltf=await loadGlbGeometry(bytes);
+ const model=gltf.scene.getObjectByName('ROOMFORM');assert.ok(model);
+ // Floor is first; host wall is next. Window sill and header must match edits.
+ const wall=model.children.find(g=>g.children.length===6);assert.ok(wall,'host wall contains three piers, header over door, sill and header around window');
+ const boxes=wall.children.map(m=>new Box3().setFromObject(m));
+ assert.ok(boxes.some(b=>Math.abs(b.max.y-1.05)<1e-5));
+ assert.ok(boxes.some(b=>Math.abs(b.min.y-2.15)<1e-5));
+ await page.locator('#object-list').selectOption('opening:0');
+ await page.locator('[name="hinge"]').selectOption('end');await page.locator('[name="swing"]').selectOption('-1');
+ await page.locator('#object-form button[type="submit"]').click();
+ assert.equal(await page.locator('[name="hinge"]').inputValue(),'end');
+ assert.equal(await page.locator('[name="swing"]').inputValue(),'-1');
+ await page.locator('#object-list').selectOption('opening:1');
+ await page.evaluate(()=>{document.querySelector('.panel').scrollTop=0;});
+ await page.screenshot({path:'test-results/automatic-openings.png',fullPage:true});
+ await page.locator('[name="height"]').fill('4');await page.locator('#object-form button[type="submit"]').click();
+ assert.equal(await page.locator('#property-error').isVisible(),true);
+ assert.deepEqual(errors,[]);
+ console.log('Opening browser checks passed: upload, door/window classification, metre scale, height editing, JSON persistence, GLB wall apertures, invalid edit rollback.');
+}finally{await browser.close();}

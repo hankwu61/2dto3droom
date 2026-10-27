@@ -1,0 +1,123 @@
+{
+  "generator": "Blender 5.2.1 LTS",
+  "version": 1,
+  "units": "meters",
+  "triangles": 65930,
+  "assets": {
+    "sofa": {
+      "node": "rf_sofa",
+      "triangles": 5464,
+      "materials": 4
+    },
+    "bed": {
+      "node": "rf_bed",
+      "triangles": 7536,
+      "materials": 5
+    },
+    "table": {
+      "node": "rf_table",
+      "triangles": 932,
+      "materials": 1
+    },
+    "chair": {
+      "node": "rf_chair",
+      "triangles": 1116,
+      "materials": 2
+    },
+    "cabinet": {
+      "node": "rf_cabinet",
+      "triangles": 2520,
+      "materials": 3
+    },
+    "block": {
+      "node": "rf_block",
+      "triangles": 188,
+      "materials": 1
+    },
+    "plant": {
+      "node": "rf_plant",
+      "triangles": 2554,
+      "materials": 3
+    },
+    "bathtub": {
+      "node": "rf_bathtub",
+      "triangles": 1002,
+      "materials": 2
+    },
+    "toilet": {
+      "node": "rf_toilet",
+      "triangles": 3176,
+      "materials": 4
+    },
+    "basin": {
+      "node": "rf_basin",
+      "triangles": 2702,
+      "materials": 6
+    },
+    "counter": {
+      "node": "rf_counter",
+      "triangles": 2984,
+      "materials": 4
+    },
+    "sink": {
+      "node": "rf_sink",
+      "triangles": 3466,
+      "materials": 5
+    },
+    "stove": {
+      "node": "rf_stove",
+      "triangles": 9488,
+      "materials": 6
+    },
+    "fridge": {
+      "node": "rf_fridge",
+      "triangles": 2432,
+      "materials": 3
+    },
+    "column": {
+      "node": "rf_column",
+      "triangles": 188,
+      "materials": 1
+    },
+    "shower": {
+      "node": "rf_shower",
+      "triangles": 2678,
+      "materials": 5
+    },
+    "washer": {
+      "node": "rf_washer",
+      "triangles": 3452,
+      "materials": 5
+    },
+    "tv": {
+      "node": "rf_tv",
+      "triangles": 744,
+      "materials": 2
+    },
+    "roundtable": {
+      "node": "rf_roundtable",
+      "triangles": 276,
+      "materials": 2
+    },
+    "door_frame": {
+      "node": "rf_door_frame",
+      "triangles": 1692,
+      "materials": 1
+    },
+    "door_leaf": {
+      "node": "rf_door_leaf",
+      "triangles": 4784,
+      "materials": 2
+    },
+    "window_frame": {
+      "node": "rf_window_frame",
+      "triangles": 3372,
+      "materials": 3
+    },
+    "sliding_panel": {
+      "node": "rf_sliding_panel",
+      "triangles": 3184,
+      "materials": 3
+    }
+  }
+}

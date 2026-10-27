@@ -1,0 +1,7 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {demoPlan} from '../src/model.js';
+const browser=await chromium.launch({channel:'chromium',headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/api/status',r=>r.fulfill({json:{vision:true,provider:'antigravity',label:'Antigravity'}}));let request;
+await page.route('**/api/analyze',r=>{request=r.request().postDataJSON();return r.fulfill({json:{...demoPlan(),scale:{estimated:true,metersPerPixel:.018,referenceLength:2,referenceLabel:'主臥床長',note:'估算'},analysis:{rounds:[{},{}],warnings:['請核對尺寸']}}});});
+await page.goto('http://127.0.0.1:5173');await page.locator('#upload').setInputFiles('public/projects/pp4.jpg');await page.waitForFunction(()=>document.querySelector('#file-name').textContent==='pp4.jpg');await page.locator('#trigger-antigravity').click();assert.ok(await page.locator('#auto-scale-field').isVisible());assert.equal(await page.locator('#engine').inputValue(),'vision');await page.waitForFunction(()=>document.querySelector('#review-summary').textContent.includes('核對 2 輪'));assert.equal(request.autoScale,true);assert.equal(request.imageWidth,1000);assert.ok((await page.locator('#scale-panel').textContent()).includes('主臥床長'));assert.deepEqual(errors,[]);console.log('AI workflow UI request, scale label and review summary passed (mock API).');}finally{await browser.close();}

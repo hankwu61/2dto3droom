@@ -1,0 +1,10 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const browser=await chromium.launch({channel:'chromium',headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{const page=await browser.newPage({viewport:{width:1600,height:1200}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5173/?project=pp4');await page.waitForFunction(()=>document.querySelector('#counts').textContent.includes('43 件家具'));await page.waitForFunction(()=>!document.querySelector('#export-skp').disabled);
+let pending=page.waitForEvent('download');await page.locator('#export-skp').click();const dl=await pending;await dl.saveAs('output/pp4-native.skp');assert.ok((await readFile('output/pp4-native.skp')).length>100000);
+await page.locator('#sketchup-import').setInputFiles('output/pp4-native.skp');await page.waitForFunction(()=>document.querySelector('#file-name').textContent==='pp4-native.skp');await page.locator('#top').click();await page.waitForTimeout(500);await page.locator('#viewport').screenshot({path:'output/sketchup-native-roundtrip.png'});
+pending=page.waitForEvent('download');await page.locator('#export-sketchup').click();const mesh=await pending;const after=JSON.parse(await readFile(await mesh.path(),'utf8')),before=JSON.parse(await readFile('output/pp4.mesh.json','utf8'));
+const bounds=p=>{const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const g of p.groups)for(const m of g.meshes)m.positions.forEach((v,i)=>{min[i%3]=Math.min(min[i%3],v);max[i%3]=Math.max(max[i%3],v);});return max.map((v,i)=>v-min[i]);};const a=bounds(before),b=bounds(after);for(let i=0;i<3;i++)assert.ok(Math.abs(a[i]-b[i])<.001,`${a} vs ${b}`);assert.equal(after.groups.length,before.groups.length);assert.equal(after.groups[0].meshes[0].color,before.groups[0].meshes[0].color);assert.deepEqual(errors,[]);console.log('Native SKP browser export/import passed: groups, bounds within 1mm, base color, rendering.');
+}finally{await browser.close();}
